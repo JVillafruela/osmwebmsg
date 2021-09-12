@@ -1,5 +1,7 @@
 {
     "require": {
-        "fabpot/goutte": "^4.0"
+        "fabpot/goutte": "^4.0",
+        "splitbrain/php-cli": "^1.1",
+        "psr/log": "^1.1"
     }
 }
