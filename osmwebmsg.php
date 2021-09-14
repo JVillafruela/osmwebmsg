@@ -8,6 +8,11 @@ use Goutte\Client;
 use Symfony\Component\DomCrawler\Crawler;
 
 class App extends PSR3CLI {
+    
+    const ERR_NO_ERROR=0;
+    const ERR_USER_NOT_FOUND=1;
+    const ERR_TOO_MANY_MSG=2;
+    
     /**
      * Register options and arguments on the given $options object
      *
@@ -74,13 +79,22 @@ class App extends PSR3CLI {
             if (empty($to)) continue;
 
             $this->info("Sending to $to \n");
-            if ($this->send($client, trim($to), $subject, $msg)) $n++;
+            $err=$this->send($client, trim($to), $subject, $msg);
+            switch ($err) {
+                case self::ERR_NO_ERROR:
+                    $n++;
+                    break;
+                case self::ERR_TOO_MANY_MSG:
+                    $this->error("Aborting. $n messages sent");
+                    exit(2);
+                    break;
+            }                   
         }
         
         $this->success("$n messages sent");
     }
 
-    function send(Client &$client,string $to,string $subject, string $body) : bool {
+    function send(Client &$client,string $to,string $subject, string $body) : int {
         $url="https://www.openstreetmap.org/message/new/$to" ;
         $crawler = $client->request('GET', $url);
         if (!$this->isUserLogged($crawler)) die("Not connected");
@@ -93,15 +107,25 @@ class App extends PSR3CLI {
            // "The user xxxx does not exist"
             $text=$crawler->filter($selector)->text();
             $this->error($text);
-            return false;
+            return self::ERR_USER_NOT_FOUND;
         }
-
+        
         $form = $crawler->selectButton('Send')->form();
         $form['message[title]'] = $subject;
         $form['message[body]'] = $body;
         $crawler = $client->submit($form);
+        
+         // You have sent a lot of messages recently. Please wait a while before trying to send any more.
+        $selector='html body.messages.messages-create div#content div.flash.error.row.align-items-center div.col';
+        $n = $crawler->filter($selector)->count();
+        if ($n==1) {
+            $text=$crawler->filter($selector)->text();
+            $this->error($text);
+            return self::ERR_TOO_MANY_MSG;
+        }        
+        
         sleep(15);
-        return true;
+        return self::ERR_NO_ERROR;
     }
 
     function login(Client &$client, string $user, string $password) : bool {
