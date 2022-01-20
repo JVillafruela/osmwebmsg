@@ -95,21 +95,28 @@ class App extends PSR3CLI {
     }
 
     function send(Client &$client,string $to,string $subject, string $body) : int {
+        $this->debug("Entering send() to=$to ");
         $url="https://www.openstreetmap.org/message/new/$to" ;
         $crawler = $client->request('GET', $url);
-        if (!$this->isUserLogged($crawler)) die("Not connected");
+        if (!$this->isUserLogged($crawler)) {
+            $this->error("Not connected");
+            die();
+        }
         sleep(5);
 
-        // css selector found by using dev tools/inspector in Firefox
-        $selector='.content-heading > div:nth-child(1) > h1:nth-child(1)'; 
+        // css selector found by using dev tools/inspector in Firefox (copy /selector css)
+        //$selector='.content-heading > div:nth-child(1) > h1:nth-child(1)'; 
+        $selector='#new_message';
         $n=$crawler->filter($selector)->count();
-        if ($n==1) {
+        $this->debug("Checking for send form n=$n");
+        if ($n==0) {
            // "The user xxxx does not exist"
-            $text=$crawler->filter($selector)->text();
-            $this->error($text);
+           //$text=$crawler->filter($selector)->text();
+            $this->error("The user $to does not exist");
             return self::ERR_USER_NOT_FOUND;
         }
         
+        $this->debug("Filling and sending form");
         $form = $crawler->selectButton('Send')->form();
         $form['message[title]'] = $subject;
         $form['message[body]'] = $body;
@@ -118,9 +125,11 @@ class App extends PSR3CLI {
          // You have sent a lot of messages recently. Please wait a while before trying to send any more.
         $selector='html body.messages.messages-create div#content div.flash.error.row.align-items-center div.col';
         $n = $crawler->filter($selector)->count();
+        $this->debug("After submit error=$n");
         if ($n==1) {
             $text=$crawler->filter($selector)->text();
             $this->error($text);
+            dumpResponse($client, "error.html");
             return self::ERR_TOO_MANY_MSG;
         }        
         
@@ -148,6 +157,10 @@ class App extends PSR3CLI {
 
 }
 
+function dumpResponse(Client &$client,$filename) {
+    $response = $client->getResponse();
+    file_put_contents($filename, $response);
+}
 
 $cli = new App();
 $cli->run();
