@@ -68,7 +68,9 @@ class App extends PSR3CLI {
         $recipients=file($frecipients, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES);
         if ($recipients===false) die("Message recipients file not found");
 
+        $this->debug("Creation client 1");
         $client = new Client();
+        $this->debug("Creation client 2");
         $client->followRedirects(true);
 
         $ok=$this->login($client,$user,$password);
@@ -138,12 +140,15 @@ class App extends PSR3CLI {
     }
 
     function login(Client &$client, string $user, string $password) : bool {
+        $this->debug("Login $user");
         $crawler = $client->request('GET', 'https://www.openstreetmap.org/login');
+        $this->debug("Login : crawler OK");
 
-        $form = $crawler->selectButton('Login')->form();
+        $form = $crawler->selectButton('Log in')->form();
         $form['username'] = $user;
         $form['password'] = $password;
 
+        $this->debug("Login : before submit");
         $crawler = $client->submit($form);
         sleep(5);
 
